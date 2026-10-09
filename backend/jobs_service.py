@@ -53,8 +53,8 @@ def clean_text(text: str) -> str:
 def get_jobs_config():
     load_dotenv()
     provider = os.getenv("JOBS_API_PROVIDER", "adzuna").lower()
-    api_key = os.getenv("JOBS_API_KEY", "")
-    app_id = os.getenv("JOBS_API_APP_ID", "")
+    api_key = os.getenv("JOBS_API_KEY") or os.getenv("ADZUNA_APP_KEY", "")
+    app_id = os.getenv("JOBS_API_APP_ID") or os.getenv("ADZUNA_APP_ID", "")
     host = os.getenv("JOBS_API_HOST", "jsearch.p.rapidapi.com")
     return provider, api_key, app_id, host
 
@@ -96,11 +96,19 @@ def calculate_dynamic_skill_match(candidate_skills: List[str], job_title: str, j
     """
     combined_text = f"{clean_text(job_title)} {clean_text(job_description)}".lower()
 
+    # Extract required job skills from taxonomy present in job text
+    job_skills_found = []
+    for skill in TECH_SKILLS_TAXONOMY:
+        pattern = r"(?<!\w)" + re.escape(skill.lower()) + r"(?!\w)"
+        if re.search(pattern, combined_text):
+            job_skills_found.append(skill)
+
     if not candidate_skills:
         return {
             "match_percentage": 50,
             "matched_skills": [],
-            "missing_skills": []
+            "missing_skills": job_skills_found,
+            "job_skills": job_skills_found
         }
 
     # Normalize and find candidate skill overlap in description
@@ -110,13 +118,6 @@ def calculate_dynamic_skill_match(candidate_skills: List[str], job_title: str, j
         pattern = r"(?<!\w)" + re.escape(s_clean.lower()) + r"(?!\w)"
         if re.search(pattern, combined_text):
             matched_skills.append(s_clean)
-
-    # Extract required job skills from taxonomy present in job text
-    job_skills_found = []
-    for skill in TECH_SKILLS_TAXONOMY:
-        pattern = r"(?<!\w)" + re.escape(skill.lower()) + r"(?!\w)"
-        if re.search(pattern, combined_text):
-            job_skills_found.append(skill)
 
     all_job_skills = list(set(job_skills_found + matched_skills))
 
